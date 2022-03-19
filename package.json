@@ -1,0 +1,26 @@
+{
+  "name": "music-bot-js",
+  "version": "0.0.1",
+  "description": "Discord Music Quiz Bot",
+  "main": "index.js",
+  "repository": "https://github.com/jonathan-ostrander/music-bot-js",
+  "author": "Jonathan Ostrander <jonathanost@gmail.com>",
+  "license": "MIT",
+  "private": false,
+  "type": "module",
+  "dependencies": {
+    "@discordjs/opus": "^0.7.0",
+    "@discordjs/rest": "^0.3.0",
+    "@discordjs/voice": "^0.8.0",
+    "discord-api-types": "^0.29.0",
+    "discord.js": "^13.6.0",
+    "ffmpeg-static": "^5.0.0",
+    "libsodium-wrappers": "^0.7.9",
+    "opusscript": "^0.0.8",
+    "pg": "^8.7.3",
+    "sodium": "^3.0.2"
+  },
+  "devDependencies": {
+    "eslint": "^8.11.0"
+  }
+}
