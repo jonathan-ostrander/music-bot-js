@@ -1,3 +1,4 @@
+import { MessageEmbed } from 'discord.js';
 import {
   AudioPlayerStatus,
   createAudioPlayer,
@@ -13,18 +14,19 @@ import { fileURLToPath } from 'url';
 
 import { gameLength } from './config.js';
 import Song from './song.js';
-import { MessageEmbed } from 'discord.js';
+import { getPlaylist, getPlaylistMetadata } from './spotify.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 export default class Game extends EventEmitter {
-  constructor(textChannel, voiceChannel) {
+  constructor(textChannel, voiceChannel, playlist, length) {
     super();
-    this.length = gameLength;
+    this.length = length || gameLength;
     this.score = {};
+    this.playlist = playlist;
 
-    const countdown = createAudioResource(join(__dirname, 'countdown.mp3'), {
+    this.countdown = createAudioResource(join(__dirname, 'countdown.mp3'), {
       inputType: StreamType.Raw,
     });
 
@@ -41,22 +43,43 @@ export default class Game extends EventEmitter {
     this.player = createAudioPlayer();
 
     this.connection.subscribe(countdownPlayer);
-    countdownPlayer.play(countdown);
+    countdownPlayer.play(this.countdown);
+    this.initSongs();
 
-    countdownPlayer.on(AudioPlayerStatus.Idle, () => {
+    countdownPlayer.once(AudioPlayerStatus.Idle, () => {
       this.init();
     });
   }
 
-  async init() {
-    this.connection.subscribe(this.player);
+  async initSongs() {
+    const tracks = [];
+    if (this.playlist) {
+      const playlistMetadata = await getPlaylistMetadata(this.playlist);
+      const playlistMetadataEmbed = new MessageEmbed()
+        .setTitle(`Fetching playlist ${playlistMetadata.name}`)
+        .setDescription(`Total songs: ${playlistMetadata.totalSongs}\n\nLikes: ${playlistMetadata.followers}`)
+        .setThumbnail(playlistMetadata.image)
+      this.textChannel.send({
+        embeds: [playlistMetadataEmbed],
+      })
+      const playlistTracks = await getPlaylist(this.playlist);
+      tracks.push(...playlistTracks.sort(() => Math.random() - Math.random()).slice(0, this.length));
+    } else {
+      const pgClient = new pg.Pool();
+      const random = await pgClient.query(`SELECT * FROM quiz_songs ORDER BY RANDOM() LIMIT ${this.length}`);
+      tracks.push(...random.rows.map(row => row.song));
+    }
 
-    const pgClient = new pg.Pool();
-    const random = await pgClient.query(`SELECT * FROM quiz_songs ORDER BY RANDOM() LIMIT ${this.length}`);
+    this.songs = tracks.map((track, i) => new Song(i + 1, track, this.textChannel));
+    return this.init();
+  }
 
-    this.songs = random.rows.map((row, i) => new Song(i + 1, JSON.parse(row.song), this.textChannel));
-    this.currentSong = 0;
-    this.playNext();
+  init() {
+    if (this.songs && this.countdown.ended) {
+      this.connection.subscribe(this.player);
+      this.currentSong = 0;
+      this.playNext();
+    }
   }
 
   playNext() {    
@@ -79,6 +102,9 @@ export default class Game extends EventEmitter {
       this.currentSong += 1;
 
       if (this.currentSong >= this.length) {
+        this.textChannel.send({
+          embeds: [song.embed(this.length, this.formattedScore())],
+        })
         this.textChannel.send({
           embeds: [new MessageEmbed().setTitle("**Music Quiz Ranking**").setDescription(this.formattedScore())],
         });

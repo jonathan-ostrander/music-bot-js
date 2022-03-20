@@ -1,6 +1,6 @@
 import { Client, Intents, MessageEmbed } from 'discord.js';
 
-import { token } from './config.js';
+import { discord } from './config.js';
 import Game from './game.js';
 
 const client = new Client({ intents: [
@@ -18,7 +18,6 @@ const games = {};
 
 client.on('interactionCreate', async interaction => {
   if (!interaction.isCommand()) return;
-
   const { commandName } = interaction;
 
   if (commandName === 'musicquiz') {
@@ -29,7 +28,12 @@ client.on('interactionCreate', async interaction => {
         ephemeral: true,
       });
     } else if (voiceChannel) {
-      const game = new Game(interaction.channel, voiceChannel);
+      const game = new Game(
+        interaction.channel,
+        voiceChannel,
+        interaction.options.getString('playlist', false),
+        interaction.options.getInteger('length', false),
+      );
       games[interaction.channelId] = game;
       game.once('end', () => {
         delete games[interaction.channelId];
@@ -58,4 +62,4 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
-client.login(token);
+client.login(discord.token);
