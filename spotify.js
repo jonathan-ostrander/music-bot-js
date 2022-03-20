@@ -27,21 +27,26 @@ async function getAccessToken() {
 }
 
 function parseTrack(response) {
-  return {
-    id: response.track.id,
-    albumCoverUrl: response.track.album.images[0].url,
-    artists: response.track.artists.map(artist => {
-      return {name: artist.name, href: artist.href};
-    }),
-    url: response.track.href,
-    preview: response.track.preview_url,
-    title: response.track.name,
+  try {
+    return {
+      id: response.track.id,
+      albumCoverUrl: response.track.album.images[0].url,
+      artists: response.track.artists.map(artist => {
+        return {name: artist.name, href: artist.href};
+      }),
+      url: response.track.href,
+      preview: response.track.preview_url,
+      title: response.track.name,
+    }
+  } catch {
+    return {};
   }
 }
 
 async function getTracks(next, accessToken, retries) {
-  if (retries <= 0) return {tracks: [], next: null};
-  else {
+  if (retries <= 0) {
+    return {tracks: [], next: null};
+  } else {
     try {
       const resp = await axios.get(next, { headers: { Authorization: `Bearer ${accessToken}` } });
       return {
