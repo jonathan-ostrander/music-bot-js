@@ -23,7 +23,7 @@ export default class Game extends EventEmitter {
     super();
     this.length = length || gameLength;
     this.score = {};
-    this.playlist = playlist;
+    this.playlist = playlist || defaultPlaylist;
 
     this.countdown = createAudioResource(join(__dirname, 'countdown.mp3'), {
       inputType: StreamType.Raw,
