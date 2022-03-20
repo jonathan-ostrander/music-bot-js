@@ -5,7 +5,7 @@ WORKDIR /usr/src/app
 
 COPY yarn.lock .
 
-RUN yarn install --pure-lockfile
+RUN yarn install
 
 COPY . .
 
