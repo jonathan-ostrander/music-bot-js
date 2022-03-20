@@ -8,6 +8,6 @@ const spotify = {
 };
 
 const gameLength = parseInt(process.env.GAME_LENGTH || '15');
+const defaultPlaylist = '6XOLmQWwf0Id5xYnKcHz3O';
 
-
-export { discord, gameLength, spotify };
+export { discord, gameLength, spotify, defaultPlaylist };
