@@ -6,13 +6,12 @@ import {
   joinVoiceChannel,
   StreamType,
 } from '@discordjs/voice';
-import pg from 'pg';
 
 import { EventEmitter } from 'node:events';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
-import { gameLength } from './config.js';
+import { gameLength, defaultPlaylist } from './config.js';
 import Song from './song.js';
 import { getPlaylist, getPlaylistMetadata } from './spotify.js';
 
@@ -53,22 +52,17 @@ export default class Game extends EventEmitter {
 
   async initSongs() {
     const tracks = [];
-    if (this.playlist) {
-      const playlistMetadata = await getPlaylistMetadata(this.playlist);
-      const playlistMetadataEmbed = new MessageEmbed()
-        .setTitle(`Fetching playlist ${playlistMetadata.name}`)
-        .setDescription(`Total songs: ${playlistMetadata.totalSongs}\n\nLikes: ${playlistMetadata.followers}`)
-        .setThumbnail(playlistMetadata.image)
-      this.textChannel.send({
-        embeds: [playlistMetadataEmbed],
-      })
-      const playlistTracks = await getPlaylist(this.playlist);
-      tracks.push(...playlistTracks.sort(() => Math.random() - Math.random()).slice(0, this.length));
-    } else {
-      const pgClient = new pg.Pool();
-      const random = await pgClient.query(`SELECT * FROM quiz_songs ORDER BY RANDOM() LIMIT ${this.length}`);
-      tracks.push(...random.rows.map(row => row.song));
-    }
+    
+    const playlistMetadata = await getPlaylistMetadata(this.playlist);
+    const playlistMetadataEmbed = new MessageEmbed()
+      .setTitle(`Fetching playlist ${playlistMetadata.name}`)
+      .setDescription(`Total songs: ${playlistMetadata.totalSongs}\n\nLikes: ${playlistMetadata.followers}`)
+      .setThumbnail(playlistMetadata.image)
+    this.textChannel.send({
+      embeds: [playlistMetadataEmbed],
+    })
+    const playlistTracks = await getPlaylist(this.playlist);
+    tracks.push(...playlistTracks.sort(() => Math.random() - Math.random()).slice(0, this.length));
 
     this.songs = tracks.map((track, i) => new Song(i + 1, track, this.textChannel));
     return this.init();
