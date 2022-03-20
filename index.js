@@ -1,6 +1,6 @@
 import { Client, Intents, MessageEmbed } from 'discord.js';
 
-import { token } from './config.js';
+import { discord } from './config.js';
 import Game from './game.js';
 
 const client = new Client({ intents: [
@@ -58,4 +58,4 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
-client.login(token);
+client.login(discord.token);
