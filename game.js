@@ -11,6 +11,7 @@ import { EventEmitter } from 'node:events';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
+import { gameLength } from './config.js';
 import Song from './song.js';
 import { MessageEmbed } from 'discord.js';
 
@@ -20,7 +21,7 @@ const __dirname = dirname(__filename);
 export default class Game extends EventEmitter {
   constructor(textChannel, voiceChannel) {
     super();
-    this.length = 5;
+    this.length = gameLength;
     this.score = {};
 
     const countdown = createAudioResource(join(__dirname, 'countdown.mp3'), {
