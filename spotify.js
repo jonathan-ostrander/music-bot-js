@@ -1,6 +1,8 @@
 import axios from 'axios';
 import htmlParser from 'node-html-parser'
 
+import { EventEmitter } from 'node:events';
+
 import { spotify as tokens } from './config.js';
 
 const authOptions = {
@@ -29,27 +31,22 @@ async function getAccessToken() {
 
 async function parseTrack(response) {
   try {
-    let previewUrl = response.track.preview_url
+    let previewUrl = response.track.preview_url;
     
     // If the preview URL isn't included in the API response then fetch the HTML for the embed
     // which includes a link to the preview track embeded Spotify players use.
-    if (!!previewUrl) {
-      console.log(`Track ${response.track.name} missing preview URL. Fetching from embed...`);
-
+    if (!!response.track.id && !previewUrl) {
       const embedResp = await axios.get(`https://open.spotify.com/embed/track/${response.track.id}`);
-      const dom = htmlParser(embedResp.data);
+      const dom = htmlParser.parse(embedResp.data);
       const trackJson = decodeURIComponent(dom.querySelector(`script#resource[type="application/json"]`).innerText);
       previewUrl = JSON.parse(trackJson).preview_url;
-
-      if (previewUrl) {
-        console.log(`Preview URL found for track ${response.track.name}`);
-      } else {
-        console.warn(`Could not find preview URL through embed for track ${response.track.name}`);
-      }
     }
+
+    const albumCoverUrl = response.track.album.images[0] ? response.track.album.images[0].url : "";
+
     return {
       id: response.track.id,
-      albumCoverUrl: response.track.album.images[0].url,
+      albumCoverUrl: albumCoverUrl,
       artists: response.track.artists.map(artist => {
         return {name: artist.name, href: artist.href};
       }),
@@ -57,7 +54,8 @@ async function parseTrack(response) {
       preview: previewUrl,
       title: response.track.name,
     };
-  } catch {
+  } catch (e) {
+    console.warn(e);
     return {};
   }
 }
@@ -68,7 +66,7 @@ async function getTracks(next, accessToken, retries) {
   } else {
     try {
       const resp = await axios.get(next, { headers: { Authorization: `Bearer ${accessToken}` } });
-      const tracks = await Promis.all(resp.data.items.map(parseTrack));
+      const tracks = await Promise.all(resp.data.items.map(parseTrack));
       return {
         tracks: tracks.filter(s => !!s.preview),
         next: resp.data.next,
@@ -88,18 +86,33 @@ function parsePlaylistId(maybeUrl) {
   }
 }
 
-async function getPlaylist(url) {
-  const playlistId = parsePlaylistId(url);
-  const accessToken = await getAccessToken();
+class PlaylistFetcher extends EventEmitter {
+  async getPlaylist(url) {
+    const playlistId = parsePlaylistId(url);
+    const accessToken = await getAccessToken();
 
-  let next = `https://api.spotify.com/v1/playlists/${playlistId}/tracks`;
-  const tracks = [];
-  while (next) {
-    const cur = await getTracks(next, accessToken, 5);
-    tracks.push(...cur.tracks);
-    next = cur.next
+    let next = `https://api.spotify.com/v1/playlists/${playlistId}/tracks`;
+    const tracks = [];
+    let sendUpdate = false;
+    while (next) {
+      const cur = await getTracks(next, accessToken, 5);
+      tracks.push(...cur.tracks);
+
+      // Limit updates to tracks fetched because event emitter/discord message API fall behind
+      if (sendUpdate) {
+        this.emit("update", tracks.length);
+        sendUpdate = false;
+      } else {
+        sendUpdate = true;
+      }
+
+      next = cur.next
+    }
+
+    this.emit("complete", tracks.length);
+
+    return tracks;
   }
-  return tracks;
 }
 
 async function getPlaylistMetadata(url) {
@@ -119,4 +132,4 @@ async function getPlaylistMetadata(url) {
   };
 }
 
-export { getPlaylist, getPlaylistMetadata };
+export { PlaylistFetcher, getPlaylistMetadata };
