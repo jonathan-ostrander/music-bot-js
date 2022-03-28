@@ -1,4 +1,5 @@
 import axios from 'axios';
+import htmlParser from 'node-html-parser'
 
 import { spotify as tokens } from './config.js';
 
@@ -26,8 +27,26 @@ async function getAccessToken() {
   }
 }
 
-function parseTrack(response) {
+async function parseTrack(response) {
   try {
+    let previewUrl = response.track.preview_url
+    
+    // If the preview URL isn't included in the API response then fetch the HTML for the embed
+    // which includes a link to the preview track embeded Spotify players use.
+    if (!!previewUrl) {
+      console.log(`Track ${response.track.name} missing preview URL. Fetching from embed...`);
+
+      const embedResp = await axios.get(`https://open.spotify.com/embed/track/${response.track.id}`);
+      const dom = htmlParser(embedResp.data);
+      const trackJson = decodeURIComponent(dom.querySelector(`script#resource[type="application/json"]`).innerText);
+      previewUrl = JSON.parse(trackJson).preview_url;
+
+      if (previewUrl) {
+        console.log(`Preview URL found for track ${response.track.name}`);
+      } else {
+        console.warn(`Could not find preview URL through embed for track ${response.track.name}`);
+      }
+    }
     return {
       id: response.track.id,
       albumCoverUrl: response.track.album.images[0].url,
@@ -35,9 +54,9 @@ function parseTrack(response) {
         return {name: artist.name, href: artist.href};
       }),
       url: response.track.href,
-      preview: response.track.preview_url,
+      preview: previewUrl,
       title: response.track.name,
-    }
+    };
   } catch {
     return {};
   }
@@ -49,8 +68,9 @@ async function getTracks(next, accessToken, retries) {
   } else {
     try {
       const resp = await axios.get(next, { headers: { Authorization: `Bearer ${accessToken}` } });
+      const tracks = await Promis.all(resp.data.items.map(parseTrack));
       return {
-        tracks: resp.data.items.map(parseTrack).filter(s => !!s.preview),
+        tracks: tracks.filter(s => !!s.preview),
         next: resp.data.next,
       };
     } catch {
