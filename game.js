@@ -82,7 +82,7 @@ export default class Game extends EventEmitter {
     });
 
     const playlistTracks = await fetcher.getPlaylist(this.playlist);
-    tracks.push(...playlistTracks.sort(() => Math.random() - Math.random()).slice(0, this.length));
+    tracks.push(...playlistTracks.map(s => [s, Math.random()]).sort((a, b) => a[1] - b[1]).map(s => s[0]).slice(0, this.length));
 
     this.songs = tracks.map((track, i) => new Song(i + 1, track, this.textChannel));
     return this.init();
