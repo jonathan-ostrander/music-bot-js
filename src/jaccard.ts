@@ -1,4 +1,4 @@
-export default function similarity(left, right) {
+export default function similarity(left: string, right: string): number {
   if (left.length == 0 && right.length == 0) return 1;
   if (left.length == 0 || right.length == 0) return 0;
   const unionSet = new Set();

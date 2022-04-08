@@ -8,6 +8,9 @@ COPY yarn.lock .
 
 RUN yarn install
 
-COPY . .
+RUN npm install -g typescript
 
-CMD [ "node", "index.js" ]
+COPY . .
+RUN tsc
+
+CMD [ "node", "target/index.js" ]
