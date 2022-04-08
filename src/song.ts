@@ -1,21 +1,39 @@
-import { AudioPlayerStatus, createAudioResource } from '@discordjs/voice';
-import { MessageEmbed } from 'discord.js';
+import { AudioPlayer, AudioPlayerStatus, AudioResource, createAudioResource } from '@discordjs/voice';
+import { MessageEmbed, TextChannel } from 'discord.js';
 
 import similarity from './jaccard.js';
+import { Track } from './spotify.js';
 
 import { EventEmitter } from 'node:events';
 
 export default class Song extends EventEmitter {
-  constructor(number, song, textChannel) {
+  number: number;
+  track: Track;
+  textChannel: TextChannel;
+  resource: AudioResource;
+
+  titleGuessed: string | null;
+  artistGuessed: string | null;
+
+  titleOptions: Array<string>;
+  artistOptions: Array<string>;
+
+  finished: boolean = false;
+
+  constructor(
+    number: number,
+    track: Track,
+    textChannel: TextChannel,
+  ) {
     super();
     this.number = number;
-    this.song = song;
+    this.track = track;
     this.textChannel = textChannel;
-    this.resource = createAudioResource(song.preview);
+    this.resource = createAudioResource(track.preview);
     this.titleGuessed = null;
     this.artistGuessed = null;
 
-    const title = song.title.toLowerCase();
+    const title = track.title.toLowerCase();
     this.titleOptions = [
       title,
     ]
@@ -29,7 +47,7 @@ export default class Song extends EventEmitter {
       .filter(t => t.length > 1);
 
     
-    this.artistOptions = song.artists
+    this.artistOptions = track.artists
       .map(a => a.name.toLowerCase())
       .flatMap(a => a.split('&'))
       .flatMap(a => a.split('and'))
@@ -37,7 +55,7 @@ export default class Song extends EventEmitter {
       .map(a => a.trim());
   }
 
-  play(player) {
+  play(player: AudioPlayer) {
     player.play(this.resource);
     const collector = this.textChannel.createMessageCollector();
     collector.on('collect', m => {
@@ -79,10 +97,10 @@ export default class Song extends EventEmitter {
     });
   }
 
-  embed(gameLength, score) {
+  embed(gameLength: number, score: string) {
     return new MessageEmbed()
-      .setTitle(`**That was: ${this.song.title} by ${this.song.artists.map(a => a.name).join(" & ")}**`)
-      .setThumbnail(this.song.albumCoverUrl)
+      .setTitle(`**That was: ${this.track.title} by ${this.track.artists.map(a => a.name).join(" & ")}**`)
+      .setThumbnail(this.track.albumCoverUrl || "")
       .setDescription(`__**LEADERBOARD**__\n\n${score}`)
       .setFooter({
         text: `Music Quiz - track ${this.number}/${gameLength}`

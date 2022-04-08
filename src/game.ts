@@ -1,10 +1,13 @@
-import { MessageEmbed } from 'discord.js';
+import { MessageEmbed, TextChannel, VoiceChannel } from 'discord.js';
 import {
+  AudioPlayer,
   AudioPlayerStatus,
+  AudioResource,
   createAudioPlayer,
   createAudioResource,
   joinVoiceChannel,
   StreamType,
+  VoiceConnection,
 } from '@discordjs/voice';
 
 import { EventEmitter } from 'node:events';
@@ -13,19 +16,38 @@ import { fileURLToPath } from 'url';
 
 import { gameLength, defaultPlaylist } from './config.js';
 import Song from './song.js';
-import { PlaylistFetcher, getPlaylistMetadata } from './spotify.js';
+import { PlaylistFetcher } from './spotify.js';
 
+// @ts-ignore
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 export default class Game extends EventEmitter {
-  constructor(textChannel, voiceChannel, playlist, length) {
+  textChannel: TextChannel;
+  voiceChannel: VoiceChannel;
+
+  playlist: string;
+  length: number;
+
+  songs: Song[] = [];
+  currentSong: number = 0;
+  score: { [key: string]: number; } = {};
+
+  countdown: AudioResource<null>;
+  connection: VoiceConnection;
+  player: AudioPlayer;
+
+  constructor(
+    textChannel: TextChannel,
+    voiceChannel: VoiceChannel,
+    playlist: string | null,
+    length: number | null,
+  ) {
     super();
     this.length = length || gameLength;
-    this.score = {};
     this.playlist = playlist || defaultPlaylist;
 
-    this.countdown = createAudioResource(join(__dirname, 'countdown.mp3'), {
+    this.countdown = createAudioResource(join(__dirname, '../countdown.mp3'), {
       inputType: StreamType.Raw,
     });
 
@@ -51,11 +73,9 @@ export default class Game extends EventEmitter {
   }
 
   async initSongs() {
-    const tracks = [];
-
     const fetcher = new PlaylistFetcher();
 
-    const playlistMetadata = await getPlaylistMetadata(this.playlist);
+    const playlistMetadata = await fetcher.getPlaylistMetadata(this.playlist);
 
     const playlistMetadataEmbed = new MessageEmbed()
       .setTitle(`Fetching playlist ${playlistMetadata.name}`)
@@ -82,14 +102,14 @@ export default class Game extends EventEmitter {
     });
 
     const playlistTracks = await fetcher.getPlaylist(this.playlist);
-    tracks.push(...playlistTracks.map(s => [s, Math.random()]).sort((a, b) => a[1] - b[1]).map(s => s[0]).slice(0, this.length));
+    const tracks = playlistTracks.map(s => {return {track: s, rand: Math.random()}}).sort((a, b) => a.rand - b.rand).map(s => s.track).slice(0, this.length);
 
     this.songs = tracks.map((track, i) => new Song(i + 1, track, this.textChannel));
     return this.init();
   }
 
   init() {
-    if (this.songs && this.countdown.ended) {
+    if (this.songs.length > 0 && this.countdown.ended) {
       this.connection.subscribe(this.player);
       this.currentSong = 0;
       this.playNext();
@@ -133,7 +153,7 @@ export default class Game extends EventEmitter {
     });
   }
 
-  formattedScore() {
+  formattedScore(): string {
     const medals = {
       0: "🥇",
       1: "🥈",

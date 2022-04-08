@@ -1,4 +1,4 @@
-import { Client, Intents, MessageEmbed } from 'discord.js';
+import { Client, GuildMember, Intents, MessageEmbed, TextChannel, VoiceChannel } from 'discord.js';
 
 import { discord } from './config.js';
 import Game from './game.js';
@@ -20,14 +20,14 @@ client.on('interactionCreate', async interaction => {
   if (!interaction.isCommand()) return;
   const { commandName } = interaction;
 
-  if (commandName === 'musicquiz') {
+  if (commandName === 'musicquiz' && interaction.member instanceof GuildMember) {
     const voiceChannel = interaction.member.voice.channel;
     if (games[interaction.channelId]) {
       await interaction.reply({
         content: "There's already a game happening you idiot.",
         ephemeral: true,
       });
-    } else if (voiceChannel) {
+    } else if (voiceChannel instanceof VoiceChannel && interaction.channel instanceof TextChannel) {
       const game = new Game(
         interaction.channel,
         voiceChannel,
